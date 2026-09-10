@@ -21,3 +21,8 @@ type Preset struct {
 }
 
 // Message represents an individual Ollama chat role and content pair
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+

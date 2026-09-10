@@ -1,0 +1,5 @@
+ollama-tui
+ollama-tui.exe
+vendor/
+*.log
+.DS_Store

@@ -57,3 +57,55 @@ func GetDefaultConfig() *Config {
 }
 
 // LoadConfig attempts to read config from the default path (~/.ollama-tui/config.json)
+func LoadConfig() (*Config, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return GetDefaultConfig(), nil
+	}
+
+	configDir := filepath.Join(home, ".ollama-tui")
+	configPath := filepath.Join(configDir, "config.json")
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			_ = os.MkdirAll(configDir, 0755)
+			defaultCfg := GetDefaultConfig()
+			jsonData, errMarshal := json.MarshalIndent(defaultCfg, "", "  ")
+			if errMarshal == nil {
+				_ = os.WriteFile(configPath, jsonData, 0644)
+			}
+			return defaultCfg, nil
+		}
+		return GetDefaultConfig(), nil
+	}
+
+	// Workaround for Go's encoding/json limitation: the standard json package does
+	// not support trailing commas. Since non-tech operational staff manually edit config.json
+	// to add their own custom prompts, they often leave trailing commas which causes parse
+	// failures. We strip trailing commas here before parsing to keep the app robust.
+	cleanedData := removeTrailingCommas(data)
+
+	var cfg Config
+	if err := json.Unmarshal(cleanedData, &cfg); err != nil {
+		return GetDefaultConfig(), err
+	}
+
+	if cfg.OllamaURL == "" {
+		cfg.OllamaURL = "http://localhost:11434"
+	}
+	if cfg.DefaultModel == "" {
+		cfg.DefaultModel = "llama3"
+	}
+	if len(cfg.Presets) == 0 {
+		cfg.Presets = GetDefaultConfig().Presets
+	}
+
+	return &cfg, nil
+}
+
+// removeTrailingCommas strips trailing commas in JSON object/array elements
+func removeTrailingCommas(data []byte) []byte {
+	re := regexp.MustCompile(`,(\s*[\]}])`)
+	return re.ReplaceAll(data, []byte("$1"))
+}
